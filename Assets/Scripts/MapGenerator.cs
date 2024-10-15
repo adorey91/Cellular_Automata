@@ -6,15 +6,17 @@ using System.Collections.Generic;
 public class MapGenerator : MonoBehaviour
 {
 
-    public int width;
-    public int height;
+    public int width = 120;
+    public int height = 80;
+    public int radius = 1;
+    public int borderSize = 3;
 
     public string seed;
     public bool useRandomSeed;
 
     [Range(0, 100)]
     public int randomFillPercent;
-    [Range( 0, 10)]
+    [Range(0, 10)]
     public int mapSmooth;
 
     int[,] map;
@@ -28,9 +30,7 @@ public class MapGenerator : MonoBehaviour
     private void Update()
     {
         if (Input.GetMouseButtonDown(0))
-        {
             GenerateMap();
-        }
     }
 
     private void GenerateMap()
@@ -44,8 +44,7 @@ public class MapGenerator : MonoBehaviour
         }
         ProcessMap();
 
-        int borderSize = 2;
-        int[,] borderedMap = new int[width + borderSize * 2,height + borderSize * 2];
+        int[,] borderedMap = new int[width + borderSize * 2, height + borderSize * 2];
 
         for (int x = 0; x < borderedMap.GetLength(0); x++)
         {
@@ -59,7 +58,7 @@ public class MapGenerator : MonoBehaviour
             }
         }
 
-                MeshGenerator meshGen = GetComponent<MeshGenerator>();
+        MeshGenerator meshGen = GetComponent<MeshGenerator>();
         meshGen.GenerateMesh(borderedMap, 1);
     }
 
@@ -68,11 +67,11 @@ public class MapGenerator : MonoBehaviour
         List<List<Coord>> wallRegions = GetRegions(1);
 
         int wallThresholdSize = 50;
-        foreach(List<Coord> wallRegion in wallRegions)
+        foreach (List<Coord> wallRegion in wallRegions)
         {
-            if(wallRegion.Count < wallThresholdSize)
+            if (wallRegion.Count < wallThresholdSize)
             {
-                foreach(Coord tile in wallRegion)
+                foreach (Coord tile in wallRegion)
                 {
                     map[tile.tileX, tile.tileY] = 0;
                 }
@@ -194,12 +193,89 @@ public class MapGenerator : MonoBehaviour
         }
     }
 
-   
+
     private void CreatePassage(Room roomA, Room roomB, Coord tileA, Coord tileB)
     {
         Room.ConnectRooms(roomA, roomB);
         Debug.DrawLine(CoordToWorldPoint(tileA), CoordToWorldPoint(tileB), Color.green, 15);
+
+        List<Coord> line = GetLine(tileA, tileB);
+
+        foreach (Coord c in line)
+        {
+            DrawCircle(c);
+        }
     }
+
+    private void DrawCircle(Coord c)
+    {
+        for (int x = -radius; x <= radius; x++)
+        {
+            for (int y = -radius; y <= radius; y++)
+            {
+                if (x * x + y * y <= radius * radius)
+                {
+                    int drawX = c.tileX + x;
+                    int drawY = c.tileY + y;
+
+                    if (IsInMapRange(drawX, drawY))
+                        map[drawX, drawY] = 0;
+                }
+            }
+        }
+    }
+
+    private List<Coord> GetLine(Coord from, Coord to)
+    {
+        List<Coord> line = new List<Coord>();
+
+        int x = from.tileX;
+        int y = from.tileY;
+
+        int dx = to.tileX - from.tileX;
+        int dy = to.tileY - from.tileY;
+
+        bool inverted = false;
+        int step = Math.Sign(dx);
+        int gradientStep = Math.Sign(dy);
+
+        int longest = Mathf.Abs(dx);
+        int shortest = Mathf.Abs(dy);
+
+        if (longest < shortest)
+        {
+            inverted = true;
+            longest = Mathf.Abs(dy);
+            shortest = Mathf.Abs(dx);
+
+            step = Math.Sign(dy);
+            gradientStep = Math.Sign(dx);
+        }
+
+        int gradientAccumulation = longest / 2;
+        for (int i = 0; i < longest; i++)
+        {
+            line.Add(new Coord(x, y));
+
+            if (inverted)
+                y += step;
+            else
+                x += step;
+
+            gradientAccumulation += shortest;
+            if (gradientAccumulation >= longest)
+            {
+                if (inverted)
+                    x += gradientStep;
+                else
+                    y += gradientStep;
+
+                gradientAccumulation -= longest;
+            }
+        }
+        return line;
+    }
+
 
     private Vector3 CoordToWorldPoint(Coord tile)
     {
@@ -215,12 +291,12 @@ public class MapGenerator : MonoBehaviour
         {
             for (int y = 0; y < height; y++)
             {
-                if(mapFlags[x, y] == 0 && map[x,y] == tileType)
+                if (mapFlags[x, y] == 0 && map[x, y] == tileType)
                 {
                     List<Coord> newRegion = GetRegionTiles(x, y);
                     regions.Add(newRegion);
 
-                    foreach(Coord tile in newRegion)
+                    foreach (Coord tile in newRegion)
                     {
                         mapFlags[tile.tileX, tile.tileY] = 1;
                     }
@@ -337,7 +413,7 @@ public class MapGenerator : MonoBehaviour
     }
 
 
-   struct Coord
+    struct Coord
     {
         public int tileX;
         public int tileY;
@@ -356,7 +432,7 @@ public class MapGenerator : MonoBehaviour
         public int roomSize;
         public bool isAccessibleFromMainRoom;
         public bool isMainRoom;
-        
+
         public Room()
         {
 
@@ -367,17 +443,17 @@ public class MapGenerator : MonoBehaviour
             tiles = roomTiles;
             roomSize = tiles.Count;
             connectedRooms = new List<Room>();
-            
+
             edgeTiles = new List<Coord>();
-            foreach(Coord tile in tiles)
+            foreach (Coord tile in tiles)
             {
-                for(int x = tile.tileX -1; x <= tile.tileX + 1; x++)
+                for (int x = tile.tileX - 1; x <= tile.tileX + 1; x++)
                 {
                     for (int y = tile.tileY - 1; y <= tile.tileY + 1; y++)
                     {
-                        if(x == tile.tileX || y == tile.tileY)
+                        if (x == tile.tileX || y == tile.tileY)
                         {
-                            if (map[x,y] == 1)
+                            if (map[x, y] == 1)
                                 edgeTiles.Add(tile);
                         }
                     }
@@ -387,10 +463,10 @@ public class MapGenerator : MonoBehaviour
 
         public void SetAccessibleFromMainRoom()
         {
-            if(!isAccessibleFromMainRoom)
+            if (!isAccessibleFromMainRoom)
             {
                 isAccessibleFromMainRoom = true;
-                foreach(Room room in connectedRooms)
+                foreach (Room room in connectedRooms)
                 {
                     room.SetAccessibleFromMainRoom();
                 }
@@ -399,9 +475,9 @@ public class MapGenerator : MonoBehaviour
 
         public static void ConnectRooms(Room roomA, Room roomB)
         {
-            if(roomA.isAccessibleFromMainRoom)
+            if (roomA.isAccessibleFromMainRoom)
                 roomB.SetAccessibleFromMainRoom();
-            else if(roomB.isAccessibleFromMainRoom)
+            else if (roomB.isAccessibleFromMainRoom)
                 roomA.SetAccessibleFromMainRoom();
 
             roomA.connectedRooms.Add(roomB);
@@ -418,5 +494,4 @@ public class MapGenerator : MonoBehaviour
             return otherRoom.roomSize.CompareTo(roomSize);
         }
     }
-
 }
